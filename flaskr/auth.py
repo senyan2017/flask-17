@@ -51,7 +51,10 @@ def register():
     password for security.
     """
     if request.method == "POST":
-        username = request.form["username"]
+        # Trim the username so " alice " and "alice" are the same account and
+        # whitespace-only names are rejected. The password is kept verbatim so
+        # leading/trailing spaces in a password stay significant.
+        username = request.form["username"].strip()
         password = request.form["password"]
         db = get_db()
         error = None
@@ -85,7 +88,7 @@ def register():
 def login():
     """Log in a registered user by adding the user id to the session."""
     if request.method == "POST":
-        username = request.form["username"]
+        username = request.form["username"].strip()
         password = request.form["password"]
         db = get_db()
         error = None

@@ -54,6 +54,19 @@ def test_create(client, auth, app):
         assert count == 2
 
 
+def test_create_strips_title(client, auth, app):
+    auth.login()
+    client.post("/create", data={"title": "  spaced  ", "body": "  keep me  "})
+
+    with app.app_context():
+        db = get_db()
+        post = db.execute("SELECT * FROM post WHERE title = 'spaced'").fetchone()
+        # the title is stored trimmed, not with its surrounding spaces
+        assert post is not None
+        # the body is intentionally stored verbatim, including its spaces
+        assert post["body"] == "  keep me  "
+
+
 def test_update(client, auth, app):
     auth.login()
     assert client.get("/1/update").status_code == 200
@@ -65,10 +78,29 @@ def test_update(client, auth, app):
         assert post["title"] == "updated"
 
 
+def test_update_strips_title(client, auth, app):
+    auth.login()
+    client.post("/1/update", data={"title": "  fresh  ", "body": ""})
+
+    with app.app_context():
+        db = get_db()
+        post = db.execute("SELECT * FROM post WHERE id = 1").fetchone()
+        assert post["title"] == "fresh"
+
+
 @pytest.mark.parametrize("path", ("/create", "/1/update"))
 def test_create_update_validate(client, auth, path):
     auth.login()
     response = client.post(path, data={"title": "", "body": ""})
+    assert b"Title is required." in response.data
+
+
+@pytest.mark.parametrize("path", ("/create", "/1/update"))
+def test_create_update_whitespace_title(client, auth, path):
+    auth.login()
+    # a title made only of whitespace is rejected just like an empty one, and
+    # the user still sees a helpful message rather than a silent failure
+    response = client.post(path, data={"title": "   ", "body": "body"})
     assert b"Title is required." in response.data
 
 

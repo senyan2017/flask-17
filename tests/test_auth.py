@@ -25,6 +25,7 @@ def test_register(client, app):
     ("username", "password", "message"),
     (
         ("", "", b"Username is required."),
+        ("   ", "x", b"Username is required."),
         ("a", "", b"Password is required."),
         ("test", "test", b"already registered"),
     ),
@@ -34,6 +35,26 @@ def test_register_validate_input(client, username, password, message):
         "/auth/register", data={"username": username, "password": password}
     )
     assert message in response.data
+
+
+def test_register_strips_username(client, app):
+    # surrounding whitespace is trimmed before the user is stored
+    response = client.post(
+        "/auth/register", data={"username": "  spacey  ", "password": "secret"}
+    )
+    assert response.headers["Location"] == "/auth/login"
+
+    with app.app_context():
+        db = get_db()
+        assert (
+            db.execute("SELECT * FROM user WHERE username = 'spacey'").fetchone()
+            is not None
+        )
+        # the padded form must not have leaked into the database
+        assert (
+            db.execute("SELECT * FROM user WHERE username = '  spacey  '").fetchone()
+            is None
+        )
 
 
 def test_login(client, auth):
@@ -59,6 +80,21 @@ def test_login(client, auth):
 def test_login_validate_input(auth, username, password, message):
     response = auth.login(username, password)
     assert message in response.data
+
+
+def test_login_username_whitespace_consistent(client):
+    # the account is created with surrounding whitespace, which is trimmed
+    client.post("/auth/register", data={"username": "  spacey  ", "password": "secret"})
+
+    # logging in with either the exact or the padded username reaches the same
+    # account, so a user is never locked out by stray spaces
+    exact = client.post("/auth/login", data={"username": "spacey", "password": "secret"})
+    assert exact.headers["Location"] == "/"
+
+    padded = client.post(
+        "/auth/login", data={"username": "  spacey  ", "password": "secret"}
+    )
+    assert padded.headers["Location"] == "/"
 
 
 def test_logout(client, auth):

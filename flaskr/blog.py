@@ -62,7 +62,9 @@ def get_post(id, check_author=True):
 def create():
     """Create a new post for the current user."""
     if request.method == "POST":
-        title = request.form["title"]
+        # Trim the title so whitespace-only titles are rejected; the body is
+        # stored verbatim so intentional formatting in the post is preserved.
+        title = request.form["title"].strip()
         body = request.form["body"]
         error = None
 
@@ -90,7 +92,7 @@ def update(id):
     post = get_post(id)
 
     if request.method == "POST":
-        title = request.form["title"]
+        title = request.form["title"].strip()
         body = request.form["body"]
         error = None
 
