@@ -72,6 +72,25 @@ def test_create_update_validate(client, auth, path):
     assert b"Title is required." in response.data
 
 
+@pytest.mark.parametrize(
+    ("path", "query", "unchanged"),
+    (
+        ("/create", "SELECT COUNT(id) FROM post", 1),
+        ("/1/update", "SELECT title FROM post WHERE id = 1", "test title"),
+    ),
+)
+def test_create_update_validate_skips_write(client, auth, app, path, query, unchanged):
+    # create and update share the same validation path: a failed check
+    # flashes the error and must not touch the database for either route
+    auth.login()
+    response = client.post(path, data={"title": "", "body": "new body"})
+    assert b"Title is required." in response.data
+
+    with app.app_context():
+        result = get_db().execute(query).fetchone()[0]
+        assert result == unchanged
+
+
 def test_delete(client, auth, app):
     auth.login()
     response = client.post("/1/delete")

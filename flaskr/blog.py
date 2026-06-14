@@ -57,28 +57,63 @@ def get_post(id, check_author=True):
     return post
 
 
+def _validate_post(title):
+    """Return an error message if the submitted post is invalid.
+
+    Every blog post form shares these rules, so new validation belongs
+    here instead of being copied into each route.
+
+    :param title: the submitted post title
+    :return: an error message, or ``None`` when the post is valid
+    """
+    if not title:
+        return "Title is required."
+
+    return None
+
+
+def _handle_post_form(save):
+    """Run the form flow shared by creating and updating a post.
+
+    Reads the submitted fields, validates them, and persists the post
+    through ``save`` when it is valid.
+
+    :param save: callable taking ``(title, body)`` that writes the post
+    :return: a redirect response after a successful save, or ``None``
+        when the caller should render the form (a GET request, or a
+        validation error that has already been flashed)
+    """
+    if request.method != "POST":
+        return None
+
+    title = request.form["title"]
+    body = request.form["body"]
+    error = _validate_post(title)
+
+    if error is not None:
+        flash(error)
+        return None
+
+    save(title, body)
+    return redirect(url_for("blog.index"))
+
+
 @bp.route("/create", methods=("GET", "POST"))
 @login_required
 def create():
     """Create a new post for the current user."""
-    if request.method == "POST":
-        title = request.form["title"]
-        body = request.form["body"]
-        error = None
 
-        if not title:
-            error = "Title is required."
+    def save(title, body):
+        db = get_db()
+        db.execute(
+            "INSERT INTO post (title, body, author_id) VALUES (?, ?, ?)",
+            (title, body, g.user["id"]),
+        )
+        db.commit()
 
-        if error is not None:
-            flash(error)
-        else:
-            db = get_db()
-            db.execute(
-                "INSERT INTO post (title, body, author_id) VALUES (?, ?, ?)",
-                (title, body, g.user["id"]),
-            )
-            db.commit()
-            return redirect(url_for("blog.index"))
+    response = _handle_post_form(save)
+    if response is not None:
+        return response
 
     return render_template("blog/create.html")
 
@@ -89,23 +124,16 @@ def update(id):
     """Update a post if the current user is the author."""
     post = get_post(id)
 
-    if request.method == "POST":
-        title = request.form["title"]
-        body = request.form["body"]
-        error = None
+    def save(title, body):
+        db = get_db()
+        db.execute(
+            "UPDATE post SET title = ?, body = ? WHERE id = ?", (title, body, id)
+        )
+        db.commit()
 
-        if not title:
-            error = "Title is required."
-
-        if error is not None:
-            flash(error)
-        else:
-            db = get_db()
-            db.execute(
-                "UPDATE post SET title = ?, body = ? WHERE id = ?", (title, body, id)
-            )
-            db.commit()
-            return redirect(url_for("blog.index"))
+    response = _handle_post_form(save)
+    if response is not None:
+        return response
 
     return render_template("blog/update.html", post=post)
 
