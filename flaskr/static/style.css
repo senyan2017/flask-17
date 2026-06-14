@@ -132,3 +132,21 @@ input[type=submit] {
   align-self: start;
   min-width: 10em;
 }
+
+.content form.filter {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.content form.filter input,
+.content form.filter select {
+  margin-bottom: 0;
+}
+
+.empty {
+  color: slategray;
+  font-style: italic;
+  margin: 1em 0;
+}

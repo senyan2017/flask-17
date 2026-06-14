@@ -81,3 +81,57 @@ def test_delete(client, auth, app):
         db = get_db()
         post = db.execute("SELECT * FROM post WHERE id = 1").fetchone()
         assert post is None
+
+
+def _add_post(app, title, body, author_id, created):
+    """Insert an extra post so filtering has something to work with."""
+    with app.app_context():
+        db = get_db()
+        db.execute(
+            "INSERT INTO post (title, body, author_id, created)"
+            " VALUES (?, ?, ?, ?)",
+            (title, body, author_id, created),
+        )
+        db.commit()
+
+
+def test_index_filter_by_keyword(client, auth, app):
+    auth.login()
+    _add_post(app, "python tips", "all about snakes", 1, "2018-02-01 00:00:00")
+
+    # keyword found in the title
+    response = client.get("/?q=python")
+    assert b"python tips" in response.data
+    assert b"test title" not in response.data
+
+    # keyword found in the body
+    response = client.get("/?q=snakes")
+    assert b"python tips" in response.data
+    assert b"test title" not in response.data
+
+    # no keyword shows every post
+    response = client.get("/")
+    assert b"python tips" in response.data
+    assert b"test title" in response.data
+
+
+def test_index_filter_by_author(client, auth, app):
+    auth.login()
+    _add_post(app, "other post", "written by other", 2, "2018-03-01 00:00:00")
+
+    # only the "test" author's posts
+    response = client.get("/?author=test")
+    assert b"test title" in response.data
+    assert b"other post" not in response.data
+
+    # only the "other" author's posts
+    response = client.get("/?author=other")
+    assert b"other post" in response.data
+    assert b"test title" not in response.data
+
+
+def test_index_filter_no_results(client, auth):
+    auth.login()
+    response = client.get("/?q=zzzznomatch")
+    assert b"No posts match your filter." in response.data
+    assert b"test title" not in response.data

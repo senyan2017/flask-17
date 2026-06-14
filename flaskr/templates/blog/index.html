@@ -8,6 +8,20 @@
 {% endblock %}
 
 {% block content %}
+  <form class="filter" method="get" action="{{ url_for('blog.index') }}">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search title or body">
+    <select name="author" aria-label="Filter by author">
+      <option value="">All authors</option>
+      {% for a in authors %}
+        <option value="{{ a['username'] }}" {% if a['username'] == author %}selected{% endif %}>{{ a['username'] }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Filter</button>
+    {% if q or author %}
+      <a class="action" href="{{ url_for('blog.index') }}">Clear</a>
+    {% endif %}
+  </form>
+
   {% for post in posts %}
     <article class="post">
       <header>
@@ -24,5 +38,13 @@
     {% if not loop.last %}
       <hr>
     {% endif %}
+  {% else %}
+    <p class="empty">
+      {% if q or author %}
+        No posts match your filter.
+      {% else %}
+        No posts yet.
+      {% endif %}
+    </p>
   {% endfor %}
 {% endblock %}

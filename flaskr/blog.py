@@ -15,14 +15,48 @@ bp = Blueprint("blog", __name__)
 
 @bp.route("/")
 def index():
-    """Show all the posts, most recent first."""
-    db = get_db()
-    posts = db.execute(
+    """Show posts, most recent first, optionally filtered.
+
+    Supports filtering by a keyword (matched against the title or body)
+    and/or by author username. Both are read from the query string so the
+    active filter is reflected in the URL and survives a refresh.
+    """
+    q = request.args.get("q", "").strip()
+    author = request.args.get("author", "").strip()
+
+    sql = (
         "SELECT p.id, title, body, created, author_id, username"
         " FROM post p JOIN user u ON p.author_id = u.id"
-        " ORDER BY created DESC"
+    )
+    conditions = []
+    params = []
+
+    if q:
+        conditions.append("(p.title LIKE ? OR p.body LIKE ?)")
+        like = f"%{q}%"
+        params.extend((like, like))
+
+    if author:
+        conditions.append("u.username = ?")
+        params.append(author)
+
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+
+    sql += " ORDER BY created DESC"
+
+    db = get_db()
+    posts = db.execute(sql, params).fetchall()
+    # authors who have at least one post, for the filter dropdown
+    authors = db.execute(
+        "SELECT DISTINCT u.username"
+        " FROM user u JOIN post p ON p.author_id = u.id"
+        " ORDER BY u.username"
     ).fetchall()
-    return render_template("blog/index.html", posts=posts)
+
+    return render_template(
+        "blog/index.html", posts=posts, authors=authors, q=q, author=author
+    )
 
 
 def get_post(id, check_author=True):
