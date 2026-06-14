@@ -72,6 +72,40 @@ def test_create_update_validate(client, auth, path):
     assert b"Title is required." in response.data
 
 
+@pytest.mark.parametrize("path", ("/create", "/1/update"))
+def test_create_update_validate_whitespace_title(client, auth, path):
+    """A title that is only whitespace should be rejected."""
+    auth.login()
+    response = client.post(path, data={"title": "   ", "body": ""})
+    assert b"Title is required." in response.data
+
+
+def test_create_strips_whitespace(client, auth, app):
+    """Leading/trailing whitespace in title and body is stripped on create."""
+    auth.login()
+    client.post("/create", data={"title": "  created  ", "body": "  body text  "})
+
+    with app.app_context():
+        db = get_db()
+        post = db.execute(
+            "SELECT * FROM post WHERE title = 'created'"
+        ).fetchone()
+        assert post is not None
+        assert post["body"] == "body text"
+
+
+def test_update_strips_whitespace(client, auth, app):
+    """Leading/trailing whitespace in title and body is stripped on update."""
+    auth.login()
+    client.post("/1/update", data={"title": "  updated  ", "body": "  new body  "})
+
+    with app.app_context():
+        db = get_db()
+        post = db.execute("SELECT * FROM post WHERE id = 1").fetchone()
+        assert post["title"] == "updated"
+        assert post["body"] == "new body"
+
+
 def test_delete(client, auth, app):
     auth.login()
     response = client.post("/1/delete")

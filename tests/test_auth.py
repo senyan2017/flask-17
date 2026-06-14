@@ -25,6 +25,7 @@ def test_register(client, app):
     ("username", "password", "message"),
     (
         ("", "", b"Username is required."),
+        ("   ", "a", b"Username is required."),
         ("a", "", b"Password is required."),
         ("test", "test", b"already registered"),
     ),
@@ -34,6 +35,24 @@ def test_register_validate_input(client, username, password, message):
         "/auth/register", data={"username": username, "password": password}
     )
     assert message in response.data
+
+
+def test_register_strips_whitespace(client, app):
+    """Registering with leading/trailing spaces stores the stripped username."""
+    response = client.post(
+        "/auth/register", data={"username": "  a  ", "password": "a"}
+    )
+    assert response.headers["Location"] == "/auth/login"
+
+    with app.app_context():
+        user = get_db().execute("SELECT * FROM user WHERE username = 'a'").fetchone()
+        assert user is not None
+
+
+def test_login_strips_whitespace(client, auth):
+    """Logging in with leading/trailing spaces in username still works."""
+    response = auth.login("  test  ", "test")
+    assert response.headers["Location"] == "/"
 
 
 def test_login(client, auth):

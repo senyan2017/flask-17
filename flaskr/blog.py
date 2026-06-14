@@ -62,8 +62,8 @@ def get_post(id, check_author=True):
 def create():
     """Create a new post for the current user."""
     if request.method == "POST":
-        title = request.form["title"]
-        body = request.form["body"]
+        title = request.form["title"].strip()
+        body = request.form["body"].strip()
         error = None
 
         if not title:
@@ -90,8 +90,8 @@ def update(id):
     post = get_post(id)
 
     if request.method == "POST":
-        title = request.form["title"]
-        body = request.form["body"]
+        title = request.form["title"].strip()
+        body = request.form["body"].strip()
         error = None
 
         if not title:
