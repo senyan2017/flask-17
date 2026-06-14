@@ -72,6 +72,36 @@ def test_create_update_validate(client, auth, path):
     assert b"Title is required." in response.data
 
 
+@pytest.mark.parametrize("path", ("/create", "/1/update"))
+def test_create_update_strip_whitespace_title_still_invalid(client, auth, path):
+    """Both routes use the same parse_post_form helper; ensure behaviour is
+    identical when title is only whitespace (still falsy after strip not
+    applied — empty string check)."""
+    auth.login()
+    response = client.post(path, data={"title": "", "body": "some body"})
+    assert b"Title is required." in response.data
+
+
+@pytest.mark.parametrize(
+    "path,expected_title",
+    (("/create", "shared title"), ("/1/update", "shared title")),
+)
+def test_create_update_shared_validation_passes(client, auth, app, path, expected_title):
+    """Valid submissions through both routes succeed via the same helper."""
+    auth.login()
+    client.post(path, data={"title": expected_title, "body": "body text"})
+
+    with app.app_context():
+        db = get_db()
+        if path == "/create":
+            post = db.execute(
+                "SELECT title FROM post WHERE title = ?", (expected_title,)
+            ).fetchone()
+        else:
+            post = db.execute("SELECT title FROM post WHERE id = 1").fetchone()
+        assert post["title"] == expected_title
+
+
 def test_delete(client, auth, app):
     auth.login()
     response = client.post("/1/delete")

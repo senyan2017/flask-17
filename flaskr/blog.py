@@ -57,27 +57,52 @@ def get_post(id, check_author=True):
     return post
 
 
+def parse_post_form():
+    """Extract and validate post form data from the current request.
+
+    :return: (title, body, error) — error is None when validation passes
+    """
+    title = request.form["title"]
+    body = request.form["body"]
+    error = None
+
+    if not title:
+        error = "Title is required."
+
+    return title, body, error
+
+
+def save_new_post(title, body):
+    """Insert a new post owned by the current user."""
+    db = get_db()
+    db.execute(
+        "INSERT INTO post (title, body, author_id) VALUES (?, ?, ?)",
+        (title, body, g.user["id"]),
+    )
+    db.commit()
+
+
+def save_existing_post(post_id, title, body):
+    """Update an existing post's title and body."""
+    db = get_db()
+    db.execute(
+        "UPDATE post SET title = ?, body = ? WHERE id = ?",
+        (title, body, post_id),
+    )
+    db.commit()
+
+
 @bp.route("/create", methods=("GET", "POST"))
 @login_required
 def create():
     """Create a new post for the current user."""
     if request.method == "POST":
-        title = request.form["title"]
-        body = request.form["body"]
-        error = None
-
-        if not title:
-            error = "Title is required."
+        title, body, error = parse_post_form()
 
         if error is not None:
             flash(error)
         else:
-            db = get_db()
-            db.execute(
-                "INSERT INTO post (title, body, author_id) VALUES (?, ?, ?)",
-                (title, body, g.user["id"]),
-            )
-            db.commit()
+            save_new_post(title, body)
             return redirect(url_for("blog.index"))
 
     return render_template("blog/create.html")
@@ -90,21 +115,12 @@ def update(id):
     post = get_post(id)
 
     if request.method == "POST":
-        title = request.form["title"]
-        body = request.form["body"]
-        error = None
-
-        if not title:
-            error = "Title is required."
+        title, body, error = parse_post_form()
 
         if error is not None:
             flash(error)
         else:
-            db = get_db()
-            db.execute(
-                "UPDATE post SET title = ?, body = ? WHERE id = ?", (title, body, id)
-            )
-            db.commit()
+            save_existing_post(id, title, body)
             return redirect(url_for("blog.index"))
 
     return render_template("blog/update.html", post=post)
